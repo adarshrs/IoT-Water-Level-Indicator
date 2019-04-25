@@ -1,188 +1,139 @@
 from tkinter import *
 from PIL import Image
 from PIL import ImageTk
-import socket
-import os
-import time
 import fonts
-import datetime
-from random import randint
+import Waterlevel
+import time
+import sys
 
-class WaterLevel:
+class imageClass:
+    def __init__(self,filename):
+        self.filename = "Images/" + filename + "-01.png"
+        self.image = Image.open(self.filename)
 
+    def resize(self,Isize):
+        h = int(Isize[0])
+        w = int(Isize[1])
+        return self.image.resize((h,w),Image.ANTIALIAS)
+
+    def loadImage(self,Isize):
+        self.photoImage = ImageTk.PhotoImage(self.resize(Isize))
+
+class font:
+    def __init__(self,fontfile,fontname):
+        fonts.loadfont(fontfile)
+        self.fontname = fontname
+
+    def fontParams(self,fontsize):
+        return (fontname,str(fontsize))
+
+class mainScreen:
     def __init__(self):
-        self.getQuote()
-        self.tk = Tk()
-
-        self.windowx = self.tk.winfo_screenwidth()
-        self.windowy = self.tk.winfo_screenheight()
-
-        string = str(self.windowx) + "x" + str(self.windowy) + "+0+0"
-        self.tk.geometry(string)
-
-        self.tk.attributes("-fullscreen", True)
-        self.tk.configure(background = "white")
-
-        Cframe = Frame(self.tk,height = self.windowy, width = self.windowx, bg = "white")
-        Cframe.place(x = 0, y = 0,height = self.windowy, width = self.windowx)
-        con = Image.open("Images/Connecting-01.png")
-        h = int(self.windowx/2)
-        connecting = con.resize((h,h),Image.ANTIALIAS)
-        connecting = ImageTk.PhotoImage(connecting)
-        splash = Label(Cframe, image = connecting, borderwidth=0)
-        splash.place(x = self.windowx/2-h/2,y = self.windowy/2-h/2)
-        self.tk.update()
-
-        fonts.loadfont("Fonts\\big_noodle_titling.ttf")
-        fonts.loadfont("Fonts\\timesi.ttf")
-
-        self.s = socket.socket()
-        port = 12345
-
         try:
-            self.s.settimeout(2)
-            self.s.connect(('192.168.0.26', port))
-            self.s.settimeout(None)
-            print("connecting")
-            self.getWaterLevel()
+            self.setParams()
+
+            self.loadFonts()
+            self.loadImages()
+
+            self.openWindow()
+
+            self.displaySplashScreen()
+            self.startWaterLevelSensor()
+
+            self.displayTankCondition()
+
+            self.tankCondition = Thread(name = 'TankIndicator', target = self.displayTankCondition)
+            self.tankCondition.start()
         except:
-            self.level = "disconnected"
+            self.gui.destroy()
+            sys.exit()
+    def setParams(self):
+        self.gui = Tk()
 
-        self.panelScreen()
+        self.windowx = self.gui.winfo_screenwidth()
+        self.windowy = self.gui.winfo_screenheight()
 
-    def panelScreen(self):
-        try:
-            Dframe = Frame(self.tk,height = self.windowy, width = self.windowx/2, bg = "white")
-            Dframe.place(x = 0, y = 0,height = self.windowy, width = self.windowx)
-            Indicator = Label(Dframe, borderwidth=0)
+        self.windowSize = str(self.windowx) + "x" + str(self.windowy) + "+0+0"
 
-            self.timeFrame = Frame(self.tk, height = self.windowy, width = self.windowx/2, bg = "white")
-            self.timeFrame.place(x = self.windowx/2, y = 0, height = self.windowy, width = self.windowx/2)
+        self.u = 20*self.windowx/self.windowy
 
-            self.todayL = Label(self.timeFrame, borderwidth = 0, justify = CENTER)
-            self.dayL = Label(self.timeFrame, borderwidth = 0, justify = CENTER)
-            self.dateL = Label(self.timeFrame, borderwidth = 0, justify = CENTER)
-            self.timeL = Label(self.timeFrame, borderwidth = 0, justify = CENTER)
+    def openWindow(self):
+        self.gui.geometry(self.windowSize)
 
-            self.todayL.place(relx = 0.2, rely = 0.2, anchor = CENTER)
-            self.dayL.place(relx = 0.6, rely = 0.2,anchor = CENTER)
-            self.dateL.place(relx = 0.4, rely = 0.45,anchor = CENTER)
-            self.timeL.place(relx = 0.4, rely = 0.7,anchor = CENTER)
+        self.gui.attributes("-fullscreen", True)
+        self.gui.configure(background = "white")
 
+    def loadFonts(self):
+        self.titlefont = font("Fonts/big_noodle_titling.ttf","BigNoodleTitling")
 
-            self.displayQuote()
+    def loadImages(self):
+        self.tank0 = imageClass("0")
+        self.tank25 = imageClass("25")
+        self.tank50 = imageClass("50")
+        self.tank75 = imageClass("75")
+        self.tank100 = imageClass("100")
+        self.noConnection = imageClass("disconnected")
 
-            while True:
-                try:
-                    self.getWaterLevel()
-                except:
-                    self.level = "disconnected"
+        self.connecting = imageClass("Connecting")
 
-                file = "Images/" + self.level + "-01.png"
-                h = self.windowx/2
-                indicator = self.displayPicture(file,(h,h))
-                Indicator.configure(image = indicator)
-                Indicator.place(x = self.windowx/4-h/2,y = self.windowy/2-h/2)
+    def displaySplashScreen(self):
+        splashFrame = Frame(self.gui, height = self.windowy, width = self.windowy, bg = "white")
+        splashFrame.pack()
 
-                self.displayTime()
+        self.connecting.loadImage((self.u*20,self.u*20))
+        splashLogo = Label(splashFrame, image = self.connecting.photoImage, borderwidth = 0)
+        splashLogo.place(relx = 0.5, rely = 0.5, anchor = CENTER)
 
-                self.tk.update()
+        self.gui.update()
 
-        finally:
-            self.s.close
+    def startWaterLevelSensor(self):
+        self.waterSensor = Waterlevel.waterLevel()
 
-    def getWaterLevel(self):
-        level = self.s.recv(1024)
-        print(level)
-        if level == b'':
-            self.s.close
-            self.level = "disconnected"
-            return
-        elif level == b'Thank you for connecting':
-            self.level = "Connected"
+    def displayTankCondition(self):
 
-        else:
-            self.level = level.decode("utf-8")
+        tankFrame = Frame(self.gui,height = self.windowy, width = self.windowx/2, bg = "white")
+        tankFrame.place(x = 0, y = 0)
 
-    def displayPicture(self,filename,size):
-        size = (int(size[0]),int(size[1]))
-        img = Image.open(filename)
-        image = img.resize(size,Image.ANTIALIAS)
-        image = ImageTk.PhotoImage(image)
-        return image
+        imageSize = (self.u*20,self.u*20)
 
-    def getTime(self):
+        self.noConnection.loadImage(imageSize)
+        self.tank0.loadImage(imageSize)
+        self.tank25.loadImage(imageSize)
+        self.tank50.loadImage(imageSize)
+        self.tank75.loadImage(imageSize)
+        self.tank100.loadImage(imageSize)
 
-        months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+        tankCondition = self.noConnection.photoImage
 
-        now = datetime.datetime.now()
-        ampm = ""
+        tankIndicator = Label(tankFrame,borderwidth = 0)
+        tankIndicator.place(relx = 0.5, rely = 0.5, anchor = CENTER)
 
-        if now.hour % 12 == 0:
-            ampm = "AM"
-        else:
-            ampm = "PM"
-
-        hour = now.hour
-        minute = now.minute
-
-        if hour<10:
-            h = "0" + str(hour)
-        else:
-            h = str(hour%12)
-
-        if minute<10:
-            m = "0" + str(minute)
-        else:
-            m = str(minute)
-
-        self.time = h + " : " + m + " " + ampm
-
-        self.date = str(now.day) + " " + months[now.month-1]
-        self.day = now.strftime("%A")
-
-    def getQuote(self):
-        f = open('Quotes/bbob.txt', 'r')
-        lines = f.readlines()
-        f.close()
-
-        delim = "*\n"
-
-        quote = list()
-        i = -1
-
-        for line in lines:
-            if line == delim:
-                quote.append("")
-                i = i+1
-                continue
-            quote[i] = quote[i] + line + "\n"
-
-        self.myquote = ""
 
         while True:
-            self.myquote = quote[randint(0,len(quote))]
-            if len(self.myquote)<100:
-                break
+            level = self.waterSensor.returnWaterLevel()
 
-    def displayQuote(self):
-        quoteFrame = Frame(self.timeFrame, height = self.windowy*0.15, width = self.windowx*0.4, bg = "white")
-        quoteFrame.place(x = self.windowx*0, y = self.windowy*0.75+self.windowy*0.1)
-        quote = Label(quoteFrame,borderwidth = 0)
-        quote.configure(text = self.myquote,bg = "white", fg = "#999999", font = ("Times New Roman Italic","13"), wraplength = 500, justify = CENTER)
-        quote.place(relx = 0.5,rely = 0.5, anchor = CENTER)
+            if level == "0":
+                tankCondition = self.tank0.photoImage
 
-    def displayTime(self):
+            elif level == "25":
+                tankCondition = self.tank25.photoImage
 
-        self.getTime()
+            elif level == "50":
+                tankCondition = self.tank50.photoImage
 
-        self.todayL.configure(text = "Today is ", bg = "white", fg = "#197C6D", font = ("BigNoodleTitling","75"))
+            elif level == "75":
+                tankCondition = self.tank75.photoImage
 
-        self.dayL.configure(text = self.day, bg = "white", fg = "#4F4F4F", font = ("BigNoodleTitling","75"))
+            else:
+                tankCondition = self.noConnection.photoImage
 
-        self.dateL.configure(text = self.date, bg = "white", fg = "#B53939", font = ("BigNoodleTitling","160"))
+            tankIndicator.configure(image = tankCondition)
+            self.gui.update()
 
-        self.timeL.configure(text = self.time, bg = "white", fg = "#4F4F4F", font = ("BigNoodleTitling","75"))
+            time.sleep(2)
 
-if __name__ == '__main__':
-    w = WaterLevel()
+    def exitWaterLevelSensor(self):
+        self.waterSensor.exitSignal()
+
+
+App = mainScreen()
