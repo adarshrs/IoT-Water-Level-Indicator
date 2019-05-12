@@ -33,6 +33,7 @@ class font:
 class mainScreen:
     def __init__(self):
         #try:
+        self.c = 0
         self.setParams()
         self.loadFonts()
         self.loadImages()
@@ -122,13 +123,10 @@ class mainScreen:
     def refreshIndicator(self,event):
         self.refTime = datetime.now()
         self.refreshed.set(" Last updated 0 min ago.")
-        self.waterSensor.connect()
         time.sleep(1)
 
-        self.level = self.waterSensor.returnWaterLevel()
+        self.level = self.waterSensor.checkLevel()
         self.displayTankCondition()
-
-        self.waterSensor.exitSensor()
 
     #Called by refreshIndicator
     def displayTankCondition(self):
@@ -148,27 +146,27 @@ class mainScreen:
 
         level = self.level
 
-        if level == b'0':
+        if level == "0":
             tankCondition = self.tank0.photoImage
             l.set("0 %")
             fg = "#B53939"
 
-        elif level == b'25':
+        elif level == "25":
             tankCondition = self.tank25.photoImage
             l.set("25 %")
             fg = "#944754"
 
-        elif level == b'50':
+        elif level == "50":
             tankCondition = self.tank50.photoImage
             l.set("50 %")
             fg = "#74566F"
 
-        elif level == b'75':
+        elif level == "75":
             tankCondition = self.tank75.photoImage
             l.set("75 %")
             fg = "#54658A"
 
-        elif level == b'100':
+        elif level == "100":
             tankCondition = self.tank100.photoImage
             l.set("100 %")
             fg = "#3474A5"
@@ -373,6 +371,9 @@ class mainScreen:
     def filledFunc(self,event):
         self.confirmFilled = 1
         self.notfillingButtonFrame.lift()
+
+    def close(self,event):
+        exit()
 
 
 

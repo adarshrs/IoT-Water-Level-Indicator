@@ -1,51 +1,24 @@
-from tkinter import *
-import socket
-from threading import Thread
 import time
+import urllib
+import socket
+import urllib.request
+from bs4 import BeautifulSoup
 
 class waterLevel:
-
     def __init__(self):
+        self.address = socket.gethostbyname("raspberrypi")
+        self.address = "http://" + self.address
+        self.level = "No connection"
 
+    def checkLevel(self):
         try:
-            self.address = socket.gethostbyname("raspberrypi")
+            server = urllib.request.urlopen(self.address)
+            code = server.read()
+            code = code.decode("utf8")
+            server.close()
+            soup = BeautifulSoup(code, 'html.parser')
+            self.level = soup.p.string[:soup.p.string.find("%")]
         except:
-            self.address = "Unknown"
+            self.level = "No connection"
 
-        self.port = 12345
-
-        self.level = "No Connection"
-
-
-
-    def connect(self):
-        if self.address == "Uknown":
-            try:
-                self.address = socket.gethostbyname("raspberrypi")
-            except:
-                self.level = "No Connection"
-                return
-
-        try:
-            self.sock = socket.socket()
-            self.sock.settimeout(2)
-            self.sock.connect((self.address, self.port))
-            self.sock.settimeout(None)
-
-        except:# No internet
-            print("Connection Error")
-            self.level = "No Connection"
-            self.sock.close
-            return
-
-        self.getWaterLevel()
-
-    def getWaterLevel(self):
-        self.level = self.sock.recv(4)
-
-    def exitSensor(self):
-        self.sock.close
-
-    def returnWaterLevel(self):
-        print(self.level)
         return self.level
